@@ -1,0 +1,18 @@
+# Secrets & local env
+.env
+*.htpasswd*
+
+# Runtime data & build artifacts
+redroid-docker/data/
+*.deb
+*.log
+*.tmp
+dist/
+build/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+__pycache__/

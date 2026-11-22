@@ -1,0 +1,14 @@
+Package: emu-root
+Version: 1.0.0
+Section: devel
+Priority: optional
+Architecture: all
+Maintainer: heryandp <https://github.com/heryandp/rooted-android-x86-docker>
+Depends: bash, curl, unzip, git, ca-certificates
+Recommends: openjdk-17-jdk-headless, qemu-kvm, libpulse0, libgl1
+Homepage: https://github.com/heryandp/rooted-android-x86-docker
+Description: Rooted Android 12 Emulator (Play Store + Magisk) CLI launcher & installer
+ emu-root provides a clean CLI launcher and automated AVD + Magisk rootAVD setup
+ helper for running a rooted Android 12 (API 31) Google Play emulator on Ubuntu/Debian.
+ After installation, run 'emu-root --setup' as your regular user to download the
+ Android SDK, create Pixel_7_API_31_Rooted, and patch ramdisk.img with Magisk.

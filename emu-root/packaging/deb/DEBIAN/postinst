@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -e
+
+cat <<'EOF'
+
+============================================================
+  emu-root has been installed to /usr/bin/emu-root
+============================================================
+Next steps (run as your normal user, NOT root):
+  1. Complete SDK, AVD & Magisk setup:
+       emu-root --setup
+  2. Start the rooted Android 12 emulator:
+       emu-root
+  3. Open a Magisk root shell:
+       emu-root --root
+
+Note: Android Emulator on Linux requires /dev/kvm.
+      For a standard VPS without KVM, use redroid-docker instead.
+============================================================
+
+EOF
+exit 0

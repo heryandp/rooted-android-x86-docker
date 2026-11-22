@@ -1,0 +1,234 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# emu-root - Rooted Android 12 Emulator Launcher for macOS (Intel & Silicon) & Linux
+# ==============================================================================
+set -euo pipefail
+
+detect_sdk() {
+  if [[ -n "${ANDROID_HOME:-}" && -d "${ANDROID_HOME}" ]]; then
+    echo "${ANDROID_HOME}"
+  elif [[ -n "${ANDROID_SDK_ROOT:-}" && -d "${ANDROID_SDK_ROOT}" ]]; then
+    echo "${ANDROID_SDK_ROOT}"
+  elif [[ "$(uname -s)" == "Darwin" && -d "${HOME}/Library/Android/sdk" ]]; then
+    echo "${HOME}/Library/Android/sdk"
+  elif [[ -d "${HOME}/Android/Sdk" ]]; then
+    echo "${HOME}/Android/Sdk"
+  else
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      echo "${HOME}/Library/Android/sdk"
+    else
+      echo "${HOME}/Android/Sdk"
+    fi
+  fi
+}
+
+SDK="$(detect_sdk)"
+export ANDROID_HOME="${SDK}"
+export ANDROID_SDK_ROOT="${SDK}"
+export ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-${HOME}/.android/avd}"
+
+AVD="${EMU_ROOT_AVD:-Pixel_7_API_31_Rooted}"
+ADB="${SDK}/platform-tools/adb"
+EMULATOR="${SDK}/emulator/emulator"
+BOOT_TIMEOUT="${EMU_ROOT_TIMEOUT:-180}"
+EXTRA_ARGS=()
+ACTION="start"
+
+usage() {
+  cat <<EOF
+Usage: emu-root [OPTIONS] [EXTRA_EMULATOR_ARGS...]
+
+Options:
+  --avd <name>    Use a custom AVD name (default: ${AVD})
+  --headless      Start emulator without window/audio (-no-window -no-audio)
+  --wipe          Wipe user data before booting (-wipe-data)
+  --status        Show SDK paths, architecture, KVM/HVF status, and ADB devices
+  --stop          Stop the currently running emulator
+  --shell         Open an interactive ADB shell on the emulator
+  --root          Open a Magisk root shell (adb -e shell su)
+  --list          List available AVDs
+  --setup         Run bundled Ubuntu/Debian user setup helper (if installed via .deb)
+  -h, --help      Show this help message
+
+Environment Variables:
+  ANDROID_HOME      Android SDK path (detected: ${SDK})
+  ANDROID_AVD_HOME  AVD directory (default: ${ANDROID_AVD_HOME})
+  EMU_ROOT_AVD      Default AVD name (default: Pixel_7_API_31_Rooted)
+  EMU_ROOT_TIMEOUT  Boot timeout in seconds (default: 180)
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --status)
+      ACTION="status"
+      shift
+      ;;
+    --stop)
+      ACTION="stop"
+      shift
+      ;;
+    --shell)
+      ACTION="shell"
+      shift
+      ;;
+    --root)
+      ACTION="root"
+      shift
+      ;;
+    --list)
+      ACTION="list"
+      shift
+      ;;
+    --setup)
+      ACTION="setup"
+      shift
+      ;;
+    --avd)
+      [[ $# -ge 2 ]] || { echo "[ERROR] --avd requires an AVD name." >&2; exit 1; }
+      AVD="$2"
+      shift 2
+      ;;
+    --headless)
+      EXTRA_ARGS+=("-no-window" "-no-audio")
+      shift
+      ;;
+    --wipe)
+      EXTRA_ARGS+=("-wipe-data")
+      shift
+      ;;
+    *)
+      EXTRA_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ "${ACTION}" == "setup" ]]; then
+  if [[ -x "/usr/share/emu-root/install-ubuntu.sh" ]]; then
+    exec bash /usr/share/emu-root/install-ubuntu.sh "${EXTRA_ARGS[@]}"
+  else
+    echo "[ERROR] Bundled setup script not found at /usr/share/emu-root/install-ubuntu.sh." >&2
+    echo "        Run the OS installer script directly from the repository instead." >&2
+    exit 1
+  fi
+fi
+
+require_bins() {
+  if [[ ! -x "${ADB}" ]]; then
+    echo "[ERROR] adb not found at: ${ADB}" >&2
+    echo "        Run the installer for your OS or set ANDROID_HOME." >&2
+    exit 1
+  fi
+  if [[ ! -x "${EMULATOR}" ]]; then
+    echo "[ERROR] emulator not found at: ${EMULATOR}" >&2
+    echo "        Run the installer for your OS or set ANDROID_HOME." >&2
+    exit 1
+  fi
+}
+
+case "${ACTION}" in
+  status)
+    echo "OS / Arch        : $(uname -s) / $(uname -m)"
+    echo "ANDROID_HOME     : ${SDK}"
+    echo "ANDROID_AVD_HOME : ${ANDROID_AVD_HOME}"
+    echo "Default AVD      : ${AVD}"
+    if [[ "$(uname -s)" == "Linux" ]]; then
+      if [[ -r /dev/kvm && -w /dev/kvm ]]; then
+        echo "KVM Acceleration : available (/dev/kvm rw)"
+      elif [[ -e /dev/kvm ]]; then
+        echo "KVM Acceleration : /dev/kvm exists but permission denied (run: sudo usermod -aG kvm \$USER)"
+      else
+        echo "KVM Acceleration : NOT available (consider redroid-docker for VPS without KVM)"
+      fi
+    fi
+    echo ""
+    if [[ -x "${ADB}" ]]; then
+      "${ADB}" devices -l
+    else
+      echo "[WARN] adb not installed at ${ADB}"
+    fi
+    exit 0
+    ;;
+  list)
+    require_bins
+    "${EMULATOR}" -list-avds
+    exit 0
+    ;;
+  stop)
+    require_bins
+    echo "Stopping running Android emulator..."
+    if "${ADB}" -e emu kill >/dev/null 2>&1; then
+      echo "Emulator stop signal sent."
+    else
+      echo "No running emulator found."
+    fi
+    exit 0
+    ;;
+  shell)
+    require_bins
+    exec "${ADB}" -e shell
+    ;;
+  root)
+    require_bins
+    exec "${ADB}" -e shell su
+    ;;
+esac
+
+require_bins
+
+if [[ "$(uname -s)" == "Linux" && ! -e /dev/kvm ]]; then
+  echo "[WARN] /dev/kvm not found. x86_64 Android Emulator requires KVM on Linux." >&2
+  echo "       For a standard VPS without KVM, use the redroid-docker setup instead." >&2
+fi
+
+if "${ADB}" devices | grep -qE '^emulator-[0-9]+[[:space:]]+device$'; then
+  echo "Emulator is already running:"
+  "${ADB}" devices -l
+  exit 0
+fi
+
+# Clean stale crash directories
+TMP_BASE="${TMPDIR:-/tmp}"
+rm -rf "${TMP_BASE%/}"/AndroidEmulator/emu-crash-* 2>/dev/null || true
+
+LOG_FILE="${TMP_BASE%/}/emu-root-${AVD}.log"
+echo "Starting ${AVD} (Android 12 Play Store + Magisk Root, Cold Boot)..."
+nohup "${EMULATOR}" -avd "${AVD}" -no-snapshot -no-metrics "${EXTRA_ARGS[@]}" >"${LOG_FILE}" 2>&1 &
+EMU_PID=$!
+
+echo "Waiting for emulator to boot (timeout ${BOOT_TIMEOUT}s, log: ${LOG_FILE})..."
+ELAPSED=0
+while ! "${ADB}" devices | grep -qE '^emulator-[0-9]+[[:space:]]+device$'; do
+  if ! kill -0 "${EMU_PID}" 2>/dev/null; then
+    echo "[ERROR] Emulator process exited early. Last 20 lines of ${LOG_FILE}:" >&2
+    tail -n 20 "${LOG_FILE}" >&2 || true
+    exit 1
+  fi
+  if [[ "${ELAPSED}" -ge "${BOOT_TIMEOUT}" ]]; then
+    echo "[ERROR] Timed out waiting for ADB connection after ${BOOT_TIMEOUT}s." >&2
+    exit 1
+  fi
+  sleep 2
+  ELAPSED=$((ELAPSED + 2))
+done
+
+while true; do
+  BOOT="$("${ADB}" -e shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n' || true)"
+  if [[ "${BOOT}" == "1" ]]; then
+    break
+  fi
+  if [[ "${ELAPSED}" -ge "${BOOT_TIMEOUT}" ]]; then
+    echo "[ERROR] Timed out waiting for sys.boot_completed after ${BOOT_TIMEOUT}s." >&2
+    exit 1
+  fi
+  sleep 2
+  ELAPSED=$((ELAPSED + 2))
+done
+
+"${ADB}" devices -l
+echo 'Ready! Use "emu-root --root" or "adb -e shell su" for root shell, or open Magisk app inside Android.'

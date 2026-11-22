@@ -1,0 +1,55 @@
+name: Validate Scripts & Build Debian Package
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check bash syntax
+        run: |
+          bash -n emu-root/bin/emu-root
+          bash -n emu-root/installers/macos/install-macos.sh
+          bash -n emu-root/installers/ubuntu/install-ubuntu.sh
+          bash -n emu-root/installers/ubuntu/build-deb.sh
+          bash -n emu-root/packaging/deb/DEBIAN/postinst
+          bash -n redroid-docker/install-vps.sh
+          bash -n redroid-docker/scripts/setup-nginx-auth.sh
+          bash -n redroid-docker/scripts/manage.sh
+
+      - name: Run shellcheck (warnings allowed)
+        run: |
+          shellcheck -S error \
+            emu-root/bin/emu-root \
+            emu-root/installers/macos/install-macos.sh \
+            emu-root/installers/ubuntu/install-ubuntu.sh \
+            emu-root/installers/ubuntu/build-deb.sh \
+            redroid-docker/install-vps.sh \
+            redroid-docker/scripts/setup-nginx-auth.sh \
+            redroid-docker/scripts/manage.sh
+
+      - name: Validate docker-compose.yml
+        run: |
+          cd redroid-docker
+          cp .env.example .env
+          docker compose config -q
+
+      - name: Build emu-root .deb package
+        run: |
+          chmod +x emu-root/installers/ubuntu/build-deb.sh
+          ./emu-root/installers/ubuntu/build-deb.sh 1.0.0
+          dpkg-deb --info dist/emu-root_1.0.0_all.deb
+          dpkg-deb --contents dist/emu-root_1.0.0_all.deb
+
+      - name: Upload .deb package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: emu-root-deb
+          path: dist/emu-root_*.deb

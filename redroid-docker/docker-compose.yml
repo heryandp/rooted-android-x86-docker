@@ -1,0 +1,49 @@
+services:
+  redroid:
+    image: ${REDROID_IMAGE:-redroid/redroid:12.0.0_64only_mindthegapps_ndk_magisk}
+    container_name: redroid
+    privileged: true
+    restart: unless-stopped
+    mem_limit: ${REDROID_MEM_LIMIT:-2560m}
+    memswap_limit: ${REDROID_MEMSWAP_LIMIT:-3584m}
+    ports:
+      # Keep ADB strictly bound to localhost! Never expose 5555 to 0.0.0.0.
+      - "${ADB_BIND:-127.0.0.1:5555}:5555"
+    volumes:
+      - ${REDROID_DATA_DIR:-./data}:/data
+    command:
+      - androidboot.redroid_gpu_mode=${REDROID_GPU_MODE:-guest}
+      - androidboot.redroid_width=${REDROID_WIDTH:-720}
+      - androidboot.redroid_height=${REDROID_HEIGHT:-1280}
+      - androidboot.redroid_dpi=${REDROID_DPI:-320}
+      - androidboot.redroid_fps=${REDROID_FPS:-24}
+      - androidboot.use_memfd=true
+      - ro.product.cpu.abilist=x86_64,arm64-v8a
+      - ro.product.cpu.abilist64=x86_64,arm64-v8a
+      - ro.dalvik.vm.isa.arm64=x86_64
+      - ro.enable.native.bridge.exec=1
+      - ro.vendor.enable.native.bridge.exec=1
+      - ro.vendor.enable.native.bridge.exec64=1
+      - ro.dalvik.vm.native.bridge=libndk_translation.so
+      - ro.ndk_translation.version=0.2.3
+
+  ws-scrcpy:
+    image: ${WS_SCRCPY_IMAGE:-smanx/ws-scrcpy:latest}
+    container_name: ws-scrcpy
+    restart: unless-stopped
+    mem_limit: ${WS_SCRCPY_MEM_LIMIT:-256m}
+    ports:
+      # Localhost internal port (proxied by Nginx with Basic Auth on port 8000, or via SSH tunnel)
+      - "${WS_SCRCPY_BIND:-127.0.0.1:18000}:8000"
+    depends_on:
+      - redroid
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        adb start-server
+        (while true; do
+          adb devices | grep -q "redroid:5555[[:space:]]*device" || adb connect redroid:5555 >/dev/null 2>&1
+          sleep 10
+        done) &
+        exec node dist/index.js
