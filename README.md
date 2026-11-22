@@ -5,6 +5,7 @@
 **Two production-tested ways to run a rooted Android 12 (API 31) environment with Google Play Store & Magisk — locally on Windows / macOS / Ubuntu, or headlessly on any Linux VPS via Docker + browser UI.**
 
 [![CI](https://github.com/heryandp/rooted-android-x86-docker/actions/workflows/ci.yml/badge.svg)](https://github.com/heryandp/rooted-android-x86-docker/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/heryandp/rooted-android-x86-docker?style=flat-square&logo=github)](https://github.com/heryandp/rooted-android-x86-docker/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 
 <!-- Stack Badges -->
@@ -118,15 +119,20 @@ chmod +x install-ubuntu.sh
 ```
 
 ### 📦 Ubuntu / Debian (`.deb` Package)
+Download directly from [GitHub Releases](https://github.com/heryandp/rooted-android-x86-docker/releases/latest):
 ```bash
-git clone https://github.com/heryandp/rooted-android-x86-docker.git
-cd rooted-android-x86-docker/emu-root/installers/ubuntu
-chmod +x build-deb.sh
-./build-deb.sh 1.0.0
-sudo apt install ../../../dist/emu-root_1.0.0_all.deb
+curl -fLO https://github.com/heryandp/rooted-android-x86-docker/releases/latest/download/emu-root_1.0.0_all.deb
+sudo apt install ./emu-root_1.0.0_all.deb
 
 # Complete SDK, AVD & Magisk setup as your normal user:
 emu-root --setup
+```
+Or build the `.deb` locally:
+```bash
+git clone https://github.com/heryandp/rooted-android-x86-docker.git
+cd rooted-android-x86-docker/emu-root/installers/ubuntu
+./build-deb.sh 1.0.0
+sudo apt install ../../../dist/emu-root_1.0.0_all.deb
 ```
 
 ### Daily `emu-root` Commands
