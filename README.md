@@ -62,6 +62,7 @@ flowchart LR
 
 ```text
 rooted-android-x86-docker/
+├── AGENTS.md                                  # AI Agent operating & ADB/VPS connection guide
 ├── emu-root/                                  # Setup 1: Local Rooted Android 12 AVD
 │   ├── bin/
 │   │   ├── emu-root.cmd                       # Windows launcher (safe PATH, -e flag, timeout)
